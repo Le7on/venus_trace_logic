@@ -147,8 +147,13 @@
   .sql-str  { color: #a5d6ff; }                       /* string literals */
   .sql-num  { color: #79c0ff; }                       /* numbers */
   .sql-cmt  { color: #8b949e; font-style: italic; }   /* comments */
-  .sql-at   { color: #ffa657; }                       /* @params */
-  td.sql-cell { padding: 4px 8px; vertical-align: top; }
+  /* Error/Warning highlight */
+  .error-row { background: rgba(255, 50, 50, 0.08); border-left: 4px solid #ff4444; }
+  .warning-row { background: rgba(255, 204, 0, 0.08); border-left: 4px solid #ffcc00; }
+  .severity-ERROR { color: #ff6b6b; font-weight: bold; }
+  .severity-WARNING { color: #ffcc00; font-weight: bold; }
+  .ctx-block { background: #1a1a2e; border-radius: 4px; padding: 6px 10px; margin: 4px 0;
+               font-family: monospace; font-size: 0.8rem; white-space: pre-wrap; color: #8b949e; }
 
   /* ── Pagination ── */
   .pagination {
@@ -239,6 +244,7 @@
     <button class="tab-btn" onclick="switchTab('levels', this)">Liquid Levels</button>
     <button class="tab-btn" onclick="switchTab('sql', this)">SQL</button>
     <button class="tab-btn" onclick="switchTab('sequences', this)">Sequences</button>
+    <button class="tab-btn" onclick="switchTab('errors', this)">⚠️ Errors</button>
     <button class="tab-btn" onclick="switchTab('lc', this)">Liquid Classes</button>
   </div>
 
@@ -312,6 +318,17 @@
     <div class="pagination" id="pg-arrays"></div>
   </div>
 
+
+  <!-- Errors Tab -->
+  <div class="tab-panel" id="tab-errors">
+    <div class="col-toggles" id="toggles-errors"></div>
+    <div class="table-wrap">
+      <table id="tbl-errors"><thead></thead><tbody></tbody></table>
+      <div class="empty-msg" id="empty-errors" style="display:none">No errors or warnings found. ✅</div>
+    </div>
+    <div class="pagination" id="pg-errors"></div>
+  </div>
+
   <!-- Liquid Classes Tab -->
   <div class="tab-panel" id="tab-lc">
     <div class="table-wrap">
@@ -339,7 +356,7 @@ const PAGE_SIZE = 100;
 const state = {
   file: null,
   data: null,
-  pages: { transfers: 1, steps: 1, entries: 1, levels: 1, sql: 1, sequences: 1 },
+  pages: { transfers: 1, steps: 1, entries: 1, levels: 1, sql: 1, sequences: 1, errors: 1 },
   cols: {
     transfers: ["Timestamp","ChannelId","SourceLabware","SourcePositionId","TargetLabware","TargetPositionId","Volume","TipLabwareId","TipPositionId","LiquidClass"],
     steps:     ["ActionType","StartTime","EndTime","Duration","StartLineNumber","ChannelActionsCount","LiquidClass"],
@@ -348,7 +365,7 @@ const state = {
     sql:       ["Timestamp","LineNumber","SqlType","Database","TableOrProc","Label","IsTruncated","Statement"],
     sequences: ["Timestamp","LineNumber","Name","Current","Count","Total","Max","Used","LabwareId","PositionId"],
   },
-  hidden: { transfers: new Set(), steps: new Set(), entries: new Set(), levels: new Set(), sql: new Set(), sequences: new Set() },
+  hidden: { transfers: new Set(), steps: new Set(), entries: new Set(), levels: new Set(), sql: new Set(), sequences: new Set(), errors: new Set() },
 };
 
 // ── Upload / Drag ──────────────────────────────────────────────────────────
@@ -378,7 +395,7 @@ async function parseFile() {
     const data = await res.json();
     if (data.error) { setStatus(data.error, true); return; }
     state.data = data;
-    state.pages = { transfers: 1, steps: 1, entries: 1, levels: 1, sql: 1, sequences: 1 };
+    state.pages = { transfers: 1, steps: 1, entries: 1, levels: 1, sql: 1, sequences: 1, errors: 1 };
     renderAll();
     document.getElementById('results-section').classList.remove('hidden');
     document.getElementById('export-btn').disabled = false;
@@ -398,6 +415,7 @@ function renderAll() {
   renderTable('levels',    state.data.liquid_levels);
   renderTable('sql',       state.data.sql_stmts);
   renderTable('sequences', state.data.sequences);
+  renderTable('errors',    state.data.error_events);
   // Liquid Classes — simple list table
   const lcData = (state.data.liquid_classes || []).map((lc, i) => ({ '#': i+1, 'Liquid Class': lc }));
   const lcTbl = document.getElementById('tbl-lc');
@@ -463,21 +481,29 @@ function renderTable(key, rows) {
     '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
 
   // Body
-  const wrapCols  = new Set(['Details', 'Source', 'Command', 'RawDetail', 'Name', 'Label']);
+  const wrapCols  = new Set(['Details', 'Source', 'Command', 'RawDetail', 'Name', 'Label', 'Message', 'ContextBefore', 'ContextAfter']);
   const objCols   = new Set(['ChannelLevels', 'Values']);
   const sqlCols   = new Set(['Statement']);
+  const ctxCols   = new Set(['ContextBefore', 'ContextAfter']);
   tbl.querySelector('tbody').innerHTML = slice.map(row =>
-    '<tr>' + cols.map(c => {
+    '<tr' + (key === 'errors' ? ` class="${row.Severity === 'ERROR' ? 'error-row' : 'warning-row'}"` : '') + '>' + cols.map(c => {
       if (sqlCols.has(c) && key === 'sql') {
         return `<td class="sql-cell"><pre class="sql-block">${highlightSql(row[c] ?? '')}</pre></td>`;
       }
+      if (ctxCols.has(c) && key === 'errors') {
+        const ctx = row[c] || '';
+        return `<td class="wrap"><pre class="ctx-block">${esc(ctx)}</pre></td>`;
+      }
       const cls = wrapCols.has(c) ? ' class="wrap"' : '';
       let val = row[c] ?? '';
+      if (c === 'Severity' && key === 'errors') {
+        val = `<span class="severity-${val}">${val}</span>`;
+      }
       if (objCols.has(c)) {
         if (Array.isArray(val)) val = val.filter(v => v !== '').join(', ');
         else if (typeof val === 'object') val = Object.entries(val).map(([k,v]) => `ch${k}: ${v}mm`).join(' | ');
       }
-      return `<td${cls}>${esc(String(val))}</td>`;
+      return `<td${cls}>${typeof val === 'string' ? esc(val) : val}</td>`;
     }).join('') + '</tr>'
   ).join('');
 

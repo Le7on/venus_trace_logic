@@ -10,6 +10,7 @@ from .enums import EntryStatus, PipettingActionType
 from .models import (
     ArrayEvent,
     ChannelAction,
+    ErrorEvent,
     LiquidLevelEvent,
     LiquidTransferEvent,
     PipettingStep,
@@ -316,6 +317,7 @@ class TraceFileParser:
         result.Variables, result.SqlStatements, result.Sequences, result.Arrays = \
             self._parse_user_traces(result.AllEntries)
         result.LiquidClasses = self._collect_liquid_classes(result.AllEntries)
+        result.ErrorEvents = self._collect_errors(lines, result.AllEntries)
         return result
 
     def parse_lines(self, lines: list[str]) -> TraceAnalysisResult:
@@ -327,6 +329,7 @@ class TraceFileParser:
         result.Variables, result.SqlStatements, result.Sequences, result.Arrays = \
             self._parse_user_traces(result.AllEntries)
         result.LiquidClasses = self._collect_liquid_classes(result.AllEntries)
+        result.ErrorEvents = self._collect_errors(lines, result.AllEntries)
         return result
 
     # ------------------------------------------------------------------
@@ -609,3 +612,57 @@ class TraceFileParser:
                     seen.append(lc)
                     seen_set.add(lc)
         return seen
+
+    # ------------------------------------------------------------------
+    # Error & Warning collection with context
+    # ------------------------------------------------------------------
+
+    def _collect_errors(
+        self, raw_lines: list[str], entries: list[TraceEntry]
+    ) -> list[ErrorEvent]:
+        """Collect all ERROR and WARNING entries with ±3 lines of context."""
+        events: list[ErrorEvent] = []
+        # Build lineno → entry map for fast lookup
+        entry_map: dict[int, TraceEntry] = {e.LineNumber: e for e in entries}
+
+        for entry in entries:
+            severity = None
+            message = entry.Details
+
+            if entry.Status == EntryStatus.Error:
+                severity = "ERROR"
+            elif "WARNING" in entry.Details.upper():
+                severity = "WARNING"
+                # Extract warning text after "WARNING:"
+                import re as _re
+                m = _re.search(r'WARNING[:\s]+(.+)', entry.Details, _re.IGNORECASE)
+                if m:
+                    message = m.group(1).strip()
+
+            if severity is None:
+                continue
+
+            # Gather context: ±3 raw lines around this entry
+            ln = entry.LineNumber
+            ctx_before = [
+                raw_lines[i].rstrip()
+                for i in range(max(0, ln - 4), ln - 1)
+                if i < len(raw_lines)
+            ]
+            ctx_after = [
+                raw_lines[i].rstrip()
+                for i in range(ln, min(len(raw_lines), ln + 3))
+            ]
+
+            events.append(ErrorEvent(
+                Timestamp=entry.Timestamp,
+                LineNumber=ln,
+                Source=entry.Source,
+                Command=entry.Command,
+                Severity=severity,
+                Message=message,
+                ContextBefore=ctx_before,
+                ContextAfter=ctx_after,
+            ))
+
+        return events

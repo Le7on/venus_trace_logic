@@ -136,6 +136,20 @@ def _serialize_result(result: TraceAnalysisResult) -> dict:
         for a in result.Arrays
     ]
 
+    error_events = [
+        {
+            "Timestamp": fmt_dt(e.Timestamp),
+            "LineNumber": e.LineNumber,
+            "Severity": e.Severity,
+            "Source": e.Source,
+            "Command": e.Command,
+            "Message": e.Message,
+            "ContextBefore": "\n".join(e.ContextBefore),
+            "ContextAfter": "\n".join(e.ContextAfter),
+        }
+        for e in result.ErrorEvents
+    ]
+
     summary = (
         f"File: {result.FileName} | "
         f"Entries: {len(result.AllEntries)} | "
@@ -146,7 +160,7 @@ def _serialize_result(result: TraceAnalysisResult) -> dict:
         f"SQL: {len(result.SqlStatements)} | "
         f"Sequences: {len(result.Sequences)} | "
         f"Arrays: {len(result.Arrays)}"
-        + (f" | Errors: {len(result.Errors)}" if result.Errors else "")
+        + (f" | ⚠️ Errors/Warnings: {len(result.ErrorEvents)}" if result.ErrorEvents else "")
     )
 
     return {
@@ -158,6 +172,7 @@ def _serialize_result(result: TraceAnalysisResult) -> dict:
         "sql_stmts": sql_stmts,
         "sequences": sequences,
         "arrays": arrays,
+        "error_events": error_events,
         "liquid_classes": result.LiquidClasses,
         "summary": summary,
         "errors": result.Errors,

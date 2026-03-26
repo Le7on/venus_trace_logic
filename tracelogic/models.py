@@ -121,6 +121,19 @@ class ArrayEvent:
 
 
 @dataclass
+class ErrorEvent:
+    """An error or warning entry with surrounding context lines."""
+    Timestamp: Optional[datetime]
+    LineNumber: int
+    Source: str
+    Command: str
+    Severity: str           # "ERROR" or "WARNING"
+    Message: str            # error/warning message text
+    ContextBefore: list[str] = field(default_factory=list)  # up to 3 lines before
+    ContextAfter: list[str] = field(default_factory=list)   # up to 3 lines after
+
+
+@dataclass
 class TraceAnalysisResult:
     """Complete result of parsing and analysing a .trc file."""
     FileName: str
@@ -133,4 +146,5 @@ class TraceAnalysisResult:
     Sequences: list[SequenceEvent] = field(default_factory=list)
     Arrays: list[ArrayEvent] = field(default_factory=list)
     LiquidClasses: list[str] = field(default_factory=list)
+    ErrorEvents: list["ErrorEvent"] = field(default_factory=list)
     Errors: list[str] = field(default_factory=list)
