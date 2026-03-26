@@ -237,10 +237,8 @@
     <button class="tab-btn" onclick="switchTab('steps', this)">Pipetting Steps</button>
     <button class="tab-btn" onclick="switchTab('entries', this)">All Entries</button>
     <button class="tab-btn" onclick="switchTab('levels', this)">Liquid Levels</button>
-    <button class="tab-btn" onclick="switchTab('variables', this)">Variables</button>
     <button class="tab-btn" onclick="switchTab('sql', this)">SQL</button>
     <button class="tab-btn" onclick="switchTab('sequences', this)">Sequences</button>
-    <button class="tab-btn" onclick="switchTab('arrays', this)">Arrays</button>
     <button class="tab-btn" onclick="switchTab('lc', this)">Liquid Classes</button>
   </div>
 
@@ -282,12 +280,7 @@
       <div class="empty-msg" id="empty-levels" style="display:none">No liquid level data found.</div>
     </div>
     <div class="pagination" id="pg-levels"></div>
-  </div>
-
-  <!-- Variables Tab -->
-  <div class="tab-panel" id="tab-variables">
-    <div class="col-toggles" id="toggles-variables"></div>
-    <div class="table-wrap">
+  </div>    <div class="table-wrap">
       <table id="tbl-variables"><thead></thead><tbody></tbody></table>
       <div class="empty-msg" id="empty-variables" style="display:none">No variables found.</div>
     </div>
@@ -312,12 +305,7 @@
       <div class="empty-msg" id="empty-sequences" style="display:none">No sequences found.</div>
     </div>
     <div class="pagination" id="pg-sequences"></div>
-  </div>
-
-  <!-- Arrays Tab -->
-  <div class="tab-panel" id="tab-arrays">
-    <div class="col-toggles" id="toggles-arrays"></div>
-    <div class="table-wrap">
+  </div>    <div class="table-wrap">
       <table id="tbl-arrays"><thead></thead><tbody></tbody></table>
       <div class="empty-msg" id="empty-arrays" style="display:none">No arrays found.</div>
     </div>
@@ -351,18 +339,16 @@ const PAGE_SIZE = 100;
 const state = {
   file: null,
   data: null,
-  pages: { transfers: 1, steps: 1, entries: 1, levels: 1, variables: 1, sql: 1, sequences: 1, arrays: 1 },
+  pages: { transfers: 1, steps: 1, entries: 1, levels: 1, sql: 1, sequences: 1 },
   cols: {
     transfers: ["Timestamp","ChannelId","SourceLabware","SourcePositionId","TargetLabware","TargetPositionId","Volume","TipLabwareId","TipPositionId","LiquidClass"],
     steps:     ["ActionType","StartTime","EndTime","Duration","StartLineNumber","ChannelActionsCount","LiquidClass"],
     entries:   ["LineNumber","Timestamp","Source","Command","Status","Details"],
     levels:    ["Timestamp","StartLineNumber","ChannelLevels"],
-    variables: ["Timestamp","LineNumber","Name","Value","RawDetail"],
     sql:       ["Timestamp","LineNumber","SqlType","Database","TableOrProc","Label","IsTruncated","Statement"],
     sequences: ["Timestamp","LineNumber","Name","Current","Count","Total","Max","Used","LabwareId","PositionId"],
-    arrays:    ["Timestamp","StartLineNumber","Name","Length","Values"],
   },
-  hidden: { transfers: new Set(), steps: new Set(), entries: new Set(), levels: new Set(), variables: new Set(), sql: new Set(), sequences: new Set(), arrays: new Set() },
+  hidden: { transfers: new Set(), steps: new Set(), entries: new Set(), levels: new Set(), sql: new Set(), sequences: new Set() },
 };
 
 // ── Upload / Drag ──────────────────────────────────────────────────────────
@@ -392,7 +378,7 @@ async function parseFile() {
     const data = await res.json();
     if (data.error) { setStatus(data.error, true); return; }
     state.data = data;
-    state.pages = { transfers: 1, steps: 1, entries: 1, levels: 1, variables: 1, sql: 1, sequences: 1, arrays: 1 };
+    state.pages = { transfers: 1, steps: 1, entries: 1, levels: 1, sql: 1, sequences: 1 };
     renderAll();
     document.getElementById('results-section').classList.remove('hidden');
     document.getElementById('export-btn').disabled = false;
@@ -410,10 +396,8 @@ function renderAll() {
   renderTable('steps',     state.data.steps);
   renderTable('entries',   state.data.entries);
   renderTable('levels',    state.data.liquid_levels);
-  renderTable('variables', state.data.variables);
   renderTable('sql',       state.data.sql_stmts);
   renderTable('sequences', state.data.sequences);
-  renderTable('arrays',    state.data.arrays);
   // Liquid Classes — simple list table
   const lcData = (state.data.liquid_classes || []).map((lc, i) => ({ '#': i+1, 'Liquid Class': lc }));
   const lcTbl = document.getElementById('tbl-lc');
