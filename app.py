@@ -54,6 +54,7 @@ def _serialize_result(result: TraceAnalysisResult) -> dict:
             "Duration": fmt_td(s.Duration),
             "StartLineNumber": s.StartLineNumber,
             "ChannelActionsCount": len(s.ChannelActions),
+            "LiquidClass": s.LiquidClass or "",
         }
         for s in result.PipettingSteps
     ]
@@ -69,15 +70,77 @@ def _serialize_result(result: TraceAnalysisResult) -> dict:
             "Volume": t.Volume if t.Volume is not None else "",
             "TipLabwareId": t.TipLabwareId,
             "TipPositionId": t.TipPositionId,
+            "LiquidClass": t.LiquidClass or "",
         }
         for t in result.LiquidTransfers
+    ]
+
+    liquid_levels = [
+        {
+            "Timestamp": fmt_dt(lv.Timestamp),
+            "StartLineNumber": lv.StartLineNumber,
+            "ChannelLevels": {str(k): v for k, v in lv.ChannelLevels.items()},
+        }
+        for lv in result.LiquidLevels
+    ]
+
+    variables = [
+        {
+            "Timestamp": fmt_dt(v.Timestamp),
+            "LineNumber": v.LineNumber,
+            "Name": v.Name or "",
+            "Value": v.Value or "",
+            "RawDetail": v.RawDetail,
+        }
+        for v in result.Variables
+    ]
+
+    sql_stmts = [
+        {
+            "Timestamp": fmt_dt(s.Timestamp),
+            "LineNumber": s.LineNumber,
+            "Statement": s.Statement,
+        }
+        for s in result.SqlStatements
+    ]
+
+    sequences = [
+        {
+            "Timestamp": fmt_dt(s.Timestamp),
+            "LineNumber": s.LineNumber,
+            "Name": s.Name or "",
+            "Current": s.Current if s.Current is not None else "",
+            "Count": s.Count if s.Count is not None else "",
+            "Total": s.Total if s.Total is not None else "",
+            "Max": s.Max if s.Max is not None else "",
+            "Used": s.Used if s.Used is not None else "",
+            "LabwareId": s.LabwareId or "",
+            "PositionId": s.PositionId or "",
+        }
+        for s in result.Sequences
+    ]
+
+    arrays = [
+        {
+            "Timestamp": fmt_dt(a.Timestamp),
+            "StartLineNumber": a.StartLineNumber,
+            "Name": a.Name,
+            "Length": len(a.Values),
+            "Values": a.Values,
+        }
+        for a in result.Arrays
     ]
 
     summary = (
         f"File: {result.FileName} | "
         f"Entries: {len(result.AllEntries)} | "
         f"Steps: {len(result.PipettingSteps)} | "
-        f"Transfers: {len(result.LiquidTransfers)}"
+        f"Transfers: {len(result.LiquidTransfers)} | "
+        f"LiquidLevels: {len(result.LiquidLevels)} | "
+        f"Variables: {len(result.Variables)} | "
+        f"SQL: {len(result.SqlStatements)} | "
+        f"Sequences: {len(result.Sequences)} | "
+        f"Arrays: {len(result.Arrays)}"
         + (f" | Errors: {len(result.Errors)}" if result.Errors else "")
     )
 
@@ -85,6 +148,12 @@ def _serialize_result(result: TraceAnalysisResult) -> dict:
         "entries": entries,
         "steps": steps,
         "transfers": transfers,
+        "liquid_levels": liquid_levels,
+        "variables": variables,
+        "sql_stmts": sql_stmts,
+        "sequences": sequences,
+        "arrays": arrays,
+        "liquid_classes": result.LiquidClasses,
         "summary": summary,
         "errors": result.Errors,
     }
@@ -105,8 +174,12 @@ def parse():
     if not f.filename:
         return jsonify({"error": "Empty filename"}), 400
 
-    content = f.read().decode("utf-8", errors="replace")
-    lines = content.splitlines()
+    content = f.read()
+    # Try UTF-8 first, fall back to latin-1 for real Hamilton STAR files
+    try:
+        lines = content.decode("utf-8", errors="strict").splitlines()
+    except UnicodeDecodeError:
+        lines = content.decode("latin-1", errors="replace").splitlines()
 
     parser = TraceFileParser()
     result = parser.parse_lines(lines)
