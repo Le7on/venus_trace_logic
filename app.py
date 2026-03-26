@@ -99,6 +99,11 @@ def _serialize_result(result: TraceAnalysisResult) -> dict:
         {
             "Timestamp": fmt_dt(s.Timestamp),
             "LineNumber": s.LineNumber,
+            "SqlType": s.SqlType,
+            "Database": s.Database or "",
+            "TableOrProc": s.TableOrProc or "",
+            "Label": s.Label or "",
+            "IsTruncated": "⚠️ Yes" if s.IsTruncated else "No",
             "Statement": s.Statement,
         }
         for s in result.SqlStatements

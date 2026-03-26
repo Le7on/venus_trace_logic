@@ -63,10 +63,96 @@ _RE_SEQ_PROP = re.compile(
     re.IGNORECASE
 )
 
-# SQL detection: lines containing SELECT/INSERT/UPDATE/DELETE/EXEC
+# SQL detection: must contain SQL keyword as a statement start (not just in text)
 _RE_SQL = re.compile(
-    r"\b(Select|Insert|Update|Delete|Exec|Execute|Use\s+\w)\b", re.IGNORECASE
+    r"(?:^|:\s*)(?:Use\s+\w|Select\b|Insert\s+(?:Into\b|[\w\[])|\bUpdate\s+[\w\[`]|Delete\s+From\b|Exec(?:ute)?\s+\w)",
+    re.IGNORECASE
 )
+
+# SQL label prefixes (strip these to get the raw SQL)
+_RE_SQL_LABEL = re.compile(
+    r"^(?:\|+\s*)?(?P<label>[\w\s\-]+?)\s*(?:SQL\s*\w*\s*)?:\s*(?P<sql>(?:Use|Select|Insert|Update|Delete|Exec)\b.+)$",
+    re.IGNORECASE
+)
+_RE_SQL_FINAL = re.compile(
+    r"^##\s*Final String\s*:\s*(?P<sql>.+)$", re.IGNORECASE
+)
+
+# SQL type detection
+_SQL_TYPES = [
+    (re.compile(r"^\s*Use\s+\w", re.IGNORECASE), "USE"),
+    (re.compile(r"\bSelect\b", re.IGNORECASE), "SELECT"),
+    (re.compile(r"\bInsert\b", re.IGNORECASE), "INSERT"),
+    (re.compile(r"\bUpdate\b", re.IGNORECASE), "UPDATE"),
+    (re.compile(r"\bDelete\b", re.IGNORECASE), "DELETE"),
+    (re.compile(r"\bExec(?:ute)?\b", re.IGNORECASE), "EXEC"),
+]
+
+# Extract database name from "Use DbName"
+_RE_USE_DB = re.compile(r"\bUse\s+(\w+)", re.IGNORECASE)
+# Extract table name from FROM/INTO/UPDATE/JOIN clauses
+_RE_TABLE = re.compile(r"\b(?:From|Into|Update|Join)\s+([\w\.]+)", re.IGNORECASE)
+# Extract stored procedure name from EXEC
+_RE_PROC = re.compile(r"\bExec(?:ute)?\s+([\w\.]+)", re.IGNORECASE)
+
+
+def _parse_sql_event(entry: "TraceEntry") -> Optional["SqlEvent"]:
+    """Extract and enrich a SqlEvent from a USER Trace entry."""
+    from .models import SqlEvent
+    detail = entry.Details
+
+    # Try label patterns first
+    label = None
+    sql_text = None
+
+    m = _RE_SQL_FINAL.match(detail.strip())
+    if m:
+        label = "Final String"
+        sql_text = m.group("sql").strip()
+    else:
+        m = _RE_SQL_LABEL.match(detail.strip())
+        if m:
+            label = m.group("label").strip()
+            sql_text = m.group("sql").strip()
+        elif _RE_SQL.search(detail):
+            sql_text = detail.strip()
+
+    if not sql_text:
+        return None
+
+    # Detect SQL type
+    sql_type = "UNKNOWN"
+    for pattern, stype in _SQL_TYPES:
+        if pattern.search(sql_text):
+            sql_type = stype
+            break
+
+    # Extract database
+    db_m = _RE_USE_DB.search(sql_text)
+    database = db_m.group(1) if db_m else None
+
+    # Extract table or proc
+    table_or_proc = None
+    if sql_type == "EXEC":
+        pm = _RE_PROC.search(sql_text)
+        table_or_proc = pm.group(1) if pm else None
+    else:
+        tm = _RE_TABLE.search(sql_text)
+        table_or_proc = tm.group(1) if tm else None
+
+    # Detect truncation (no semicolon at end, statement looks incomplete)
+    is_truncated = not sql_text.rstrip().endswith(";") and len(sql_text) > 150
+
+    return SqlEvent(
+        Timestamp=entry.Timestamp,
+        LineNumber=entry.LineNumber,
+        Statement=sql_text,
+        SqlType=sql_type,
+        Database=database,
+        TableOrProc=table_or_proc,
+        Label=label,
+        IsTruncated=is_truncated,
+    )
 
 _TIMESTAMP_FMT = "%Y-%m-%d %H:%M:%S"
 
@@ -439,11 +525,9 @@ class TraceFileParser:
 
             # ---- SQL ----
             if _RE_SQL.search(detail):
-                sql_stmts.append(SqlEvent(
-                    Timestamp=entry.Timestamp,
-                    LineNumber=entry.LineNumber,
-                    Statement=detail,
-                ))
+                evt = _parse_sql_event(entry)
+                if evt:
+                    sql_stmts.append(evt)
                 flush_seq()
                 continue
 

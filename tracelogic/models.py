@@ -79,7 +79,12 @@ class SqlEvent:
     """A USER Trace line containing a SQL statement."""
     Timestamp: Optional[datetime]
     LineNumber: int
-    Statement: str
+    Statement: str                  # full SQL text (may be truncated by .trc line limit)
+    SqlType: str = ""               # SELECT / INSERT / UPDATE / DELETE / EXEC / USE / UNKNOWN
+    Database: Optional[str] = None  # extracted from "Use DbName"
+    TableOrProc: Optional[str] = None  # main table or stored procedure name
+    Label: Optional[str] = None     # label prefix e.g. "Initial SQL Query", "SQL_ActiveUser"
+    IsTruncated: bool = False       # True if line ends mid-statement (no semicolon)
 
 
 @dataclass

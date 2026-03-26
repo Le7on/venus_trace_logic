@@ -346,7 +346,7 @@ const state = {
     entries:   ["LineNumber","Timestamp","Source","Command","Status","Details"],
     levels:    ["Timestamp","StartLineNumber","ChannelLevels"],
     variables: ["Timestamp","LineNumber","Name","Value","RawDetail"],
-    sql:       ["Timestamp","LineNumber","Statement"],
+    sql:       ["Timestamp","LineNumber","SqlType","Database","TableOrProc","Label","IsTruncated","Statement"],
     sequences: ["Timestamp","LineNumber","Name","Current","Count","Total","Max","Used","LabwareId","PositionId"],
     arrays:    ["Timestamp","StartLineNumber","Name","Length","Values"],
   },
@@ -448,7 +448,7 @@ function renderTable(key, rows) {
     '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
 
   // Body
-  const wrapCols = new Set(['Details', 'Source', 'Command', 'Statement', 'RawDetail', 'Name']);
+  const wrapCols = new Set(['Details', 'Source', 'Command', 'Statement', 'RawDetail', 'Name', 'Label']);
   const objCols  = new Set(['ChannelLevels', 'Values']);
   tbl.querySelector('tbody').innerHTML = slice.map(row =>
     '<tr>' + cols.map(c => {
