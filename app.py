@@ -125,17 +125,6 @@ def _serialize_result(result: TraceAnalysisResult) -> dict:
         for s in result.Sequences
     ]
 
-    arrays = [
-        {
-            "Timestamp": fmt_dt(a.Timestamp),
-            "StartLineNumber": a.StartLineNumber,
-            "Name": a.Name,
-            "Length": len(a.Values),
-            "Values": a.Values,
-        }
-        for a in result.Arrays
-    ]
-
     error_events = [
         {
             "Timestamp": fmt_dt(e.Timestamp),
@@ -158,8 +147,7 @@ def _serialize_result(result: TraceAnalysisResult) -> dict:
         f"LiquidLevels: {len(result.LiquidLevels)} | "
         f"Variables: {len(result.Variables)} | "
         f"SQL: {len(result.SqlStatements)} | "
-        f"Sequences: {len(result.Sequences)} | "
-        f"Arrays: {len(result.Arrays)}"
+        f"Sequences: {len(result.Sequences)}"
         + (f" | ⚠️ Errors/Warnings: {len(result.ErrorEvents)}" if result.ErrorEvents else "")
     )
 
@@ -171,7 +159,6 @@ def _serialize_result(result: TraceAnalysisResult) -> dict:
         "variables": variables,
         "sql_stmts": sql_stmts,
         "sequences": sequences,
-        "arrays": arrays,
         "error_events": error_events,
         "liquid_classes": result.LiquidClasses,
         "summary": summary,

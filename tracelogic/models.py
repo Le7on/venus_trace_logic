@@ -104,23 +104,6 @@ class SequenceEvent:
 
 
 @dataclass
-class ArrayEvent:
-    """A DEBUG TraceArray block — named array with indexed values.
-
-    Example .trc block::
-
-        2026-01-01 09:00:00> DEBUG : TraceArray - complete; name = myArray
-        2026-01-01 09:00:00> DEBUG : TraceArray - complete; 0 = 100
-        2026-01-01 09:00:00> DEBUG : TraceArray - complete; 1 = 200
-    """
-    Timestamp: Optional[datetime]
-    StartLineNumber: int
-    Name: str
-    Values: list[str] = field(default_factory=list)   # index-ordered values
-    RawItems: dict[int, str] = field(default_factory=dict)  # {index: value}
-
-
-@dataclass
 class ErrorEvent:
     """An error or warning entry with surrounding context lines."""
     Timestamp: Optional[datetime]
@@ -144,7 +127,6 @@ class TraceAnalysisResult:
     Variables: list[VariableEvent] = field(default_factory=list)
     SqlStatements: list[SqlEvent] = field(default_factory=list)
     Sequences: list[SequenceEvent] = field(default_factory=list)
-    Arrays: list[ArrayEvent] = field(default_factory=list)
     LiquidClasses: list[str] = field(default_factory=list)
     ErrorEvents: list["ErrorEvent"] = field(default_factory=list)
     Errors: list[str] = field(default_factory=list)

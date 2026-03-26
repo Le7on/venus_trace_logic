@@ -2,7 +2,6 @@
 
 from .enums import EntryStatus, PipettingActionType
 from .models import (
-    ArrayEvent,
     ChannelAction,
     ErrorEvent,
     LiquidLevelEvent,

@@ -8,7 +8,6 @@ from typing import Optional
 
 from .enums import EntryStatus, PipettingActionType
 from .models import (
-    ArrayEvent,
     ChannelAction,
     ErrorEvent,
     LiquidLevelEvent,
@@ -66,7 +65,7 @@ _RE_SEQ_PROP = re.compile(
 
 # SQL detection: must contain SQL keyword as a statement start (not just in text)
 _RE_SQL = re.compile(
-    r"(?:^|:\s*)(?:Use\s+\w|Select\b|Insert\s+(?:Into\b|[\w\[])|\bUpdate\s+[\w\[`]|Delete\s+From\b|Exec(?:ute)?\s+\w)",
+    r"(?:^|:\s*)(?:Use\s+\w|Select\b|Insert\s+Into\b|Insert\s+[\w\[`]|Update\s+[\w\[`]\s+Set\b|Delete\s+From\b|Exec(?:ute)?\s+\w)",
     re.IGNORECASE
 )
 
@@ -314,7 +313,7 @@ class TraceFileParser:
         result.AllEntries = self._parse_entries(lines, result.Errors)
         result.PipettingSteps, result.LiquidLevels = self._aggregate_steps(result.AllEntries)
         result.LiquidTransfers = self._build_transfers(result.PipettingSteps)
-        result.Variables, result.SqlStatements, result.Sequences, result.Arrays = \
+        result.Variables, result.SqlStatements, result.Sequences = \
             self._parse_user_traces(result.AllEntries)
         result.LiquidClasses = self._collect_liquid_classes(result.AllEntries)
         result.ErrorEvents = self._collect_errors(lines, result.AllEntries)
@@ -326,7 +325,7 @@ class TraceFileParser:
         result.AllEntries = self._parse_entries(lines, result.Errors)
         result.PipettingSteps, result.LiquidLevels = self._aggregate_steps(result.AllEntries)
         result.LiquidTransfers = self._build_transfers(result.PipettingSteps)
-        result.Variables, result.SqlStatements, result.Sequences, result.Arrays = \
+        result.Variables, result.SqlStatements, result.Sequences = \
             self._parse_user_traces(result.AllEntries)
         result.LiquidClasses = self._collect_liquid_classes(result.AllEntries)
         result.ErrorEvents = self._collect_errors(lines, result.AllEntries)
@@ -478,19 +477,15 @@ class TraceFileParser:
 
     def _parse_user_traces(
         self, entries: list[TraceEntry]
-    ) -> tuple[list[VariableEvent], list[SqlEvent], list[SequenceEvent], list[ArrayEvent]]:
+    ) -> tuple[list[VariableEvent], list[SqlEvent], list[SequenceEvent]]:
         variables: list[VariableEvent] = []
         sql_stmts: list[SqlEvent] = []
         sequences: list[SequenceEvent] = []
-        arrays: list[ArrayEvent] = []
 
         # Sequence accumulator
         seq_buf: dict = {}
         seq_ts: Optional[datetime] = None
         seq_lineno: int = 0
-
-        # Array accumulator
-        arr_buf: Optional[ArrayEvent] = None
 
         def flush_seq():
             if seq_buf:
@@ -509,46 +504,12 @@ class TraceFileParser:
                 ))
                 seq_buf.clear()
 
-        def flush_arr():
-            nonlocal arr_buf
-            if arr_buf:
-                # Build ordered Values list from RawItems
-                if arr_buf.RawItems:
-                    max_idx = max(arr_buf.RawItems.keys())
-                    arr_buf.Values = [
-                        arr_buf.RawItems.get(i, "") for i in range(max_idx + 1)
-                    ]
-                arrays.append(arr_buf)
-                arr_buf = None
-
-        # Regex for array index lines: "[1]: value"
-        re_arr_idx = re.compile(r"^\[(?P<idx>\d+)\]:\s*(?P<val>.+)$")
-        # Array command detection: command contains "TraceArray"
-        def is_array_cmd(cmd: str) -> bool:
-            return "TraceArray" in cmd or "tracearray" in cmd.lower()
-
         for entry in entries:
             detail = entry.Details
 
-            # ---- Array block (DEBUG : *TraceArray*) ----
-            if entry.Source == "DEBUG" and is_array_cmd(entry.Command):
-                idx_m = re_arr_idx.match(detail.strip())
-
-                if idx_m and arr_buf is not None:
-                    # Indexed value line: [1]: value
-                    arr_buf.RawItems[int(idx_m.group("idx"))] = idx_m.group("val").strip()
-                elif not idx_m:
-                    # Non-indexed line = header/description → start new array block
-                    flush_arr()
-                    arr_name = entry.Command.split("::")[-1].strip()  # e.g. TraceArray or TraceArray_2
-                    arr_buf = ArrayEvent(
-                        Timestamp=entry.Timestamp,
-                        StartLineNumber=entry.LineNumber,
-                        Name=f"{arr_name}: {detail.strip()[:80]}",
-                    )
+            # Skip DEBUG entries (TraceArray etc.)
+            if entry.Source == "DEBUG":
                 continue
-
-            flush_arr()
 
             if entry.Source not in ("USER", "TRACELEVEL"):
                 flush_seq()
@@ -587,8 +548,7 @@ class TraceFileParser:
                 ))
 
         flush_seq()
-        flush_arr()
-        return variables, sql_stmts, sequences, arrays
+        return variables, sql_stmts, sequences
 
     # ------------------------------------------------------------------
     # Step 5: collect all referenced liquid class names

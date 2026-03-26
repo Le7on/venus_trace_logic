@@ -135,8 +135,9 @@
   }
   tbody tr { border-bottom: 1px solid var(--border); }
   tbody tr:hover { background: var(--row-hover); }
-  tbody td { padding: 6px 10px; color: var(--text-dim); white-space: nowrap; }
+  tbody td { padding: 6px 10px; color: var(--text-dim); white-space: nowrap; user-select: text; cursor: text; }
   tbody td.wrap { white-space: normal; word-break: break-word; max-width: 300px; }
+  .sql-block, .ctx-block { user-select: text; cursor: text; }
 
   /* SQL syntax highlight */
   .sql-block { background: #1a1a2e; border-radius: 6px; padding: 10px 14px; margin: 0;
@@ -242,6 +243,7 @@
     <button class="tab-btn" onclick="switchTab('steps', this)">Pipetting Steps</button>
     <button class="tab-btn" onclick="switchTab('entries', this)">All Entries</button>
     <button class="tab-btn" onclick="switchTab('levels', this)">Liquid Levels</button>
+    <button class="tab-btn" onclick="switchTab('variables', this)">Variables</button>
     <button class="tab-btn" onclick="switchTab('sql', this)">SQL</button>
     <button class="tab-btn" onclick="switchTab('sequences', this)">Sequences</button>
     <button class="tab-btn" onclick="switchTab('errors', this)">⚠️ Errors</button>
@@ -278,7 +280,7 @@
     <div class="pagination" id="pg-entries"></div>
   </div>
 
-  <!-- Liquid Levels Tab -->
+    <!-- Liquid Levels Tab -->
   <div class="tab-panel" id="tab-levels">
     <div class="col-toggles" id="toggles-levels"></div>
     <div class="table-wrap">
@@ -286,7 +288,12 @@
       <div class="empty-msg" id="empty-levels" style="display:none">No liquid level data found.</div>
     </div>
     <div class="pagination" id="pg-levels"></div>
-  </div>    <div class="table-wrap">
+  </div>
+
+  <!-- Variables Tab -->
+  <div class="tab-panel" id="tab-variables">
+    <div class="col-toggles" id="toggles-variables"></div>
+    <div class="table-wrap">
       <table id="tbl-variables"><thead></thead><tbody></tbody></table>
       <div class="empty-msg" id="empty-variables" style="display:none">No variables found.</div>
     </div>
@@ -311,11 +318,6 @@
       <div class="empty-msg" id="empty-sequences" style="display:none">No sequences found.</div>
     </div>
     <div class="pagination" id="pg-sequences"></div>
-  </div>    <div class="table-wrap">
-      <table id="tbl-arrays"><thead></thead><tbody></tbody></table>
-      <div class="empty-msg" id="empty-arrays" style="display:none">No arrays found.</div>
-    </div>
-    <div class="pagination" id="pg-arrays"></div>
   </div>
 
 
@@ -356,16 +358,17 @@ const PAGE_SIZE = 100;
 const state = {
   file: null,
   data: null,
-  pages: { transfers: 1, steps: 1, entries: 1, levels: 1, sql: 1, sequences: 1, errors: 1 },
+  pages: { transfers: 1, steps: 1, entries: 1, levels: 1, variables: 1, sql: 1, sequences: 1, errors: 1 },
   cols: {
     transfers: ["Timestamp","ChannelId","SourceLabware","SourcePositionId","TargetLabware","TargetPositionId","Volume","TipLabwareId","TipPositionId","LiquidClass"],
     steps:     ["ActionType","StartTime","EndTime","Duration","StartLineNumber","ChannelActionsCount","LiquidClass"],
     entries:   ["LineNumber","Timestamp","Source","Command","Status","Details"],
     levels:    ["Timestamp","StartLineNumber","ChannelLevels"],
+    variables: ["Timestamp","LineNumber","Name","Value"],
     sql:       ["Timestamp","LineNumber","SqlType","Database","TableOrProc","Label","IsTruncated","Statement"],
     sequences: ["Timestamp","LineNumber","Name","Current","Count","Total","Max","Used","LabwareId","PositionId"],
   },
-  hidden: { transfers: new Set(), steps: new Set(), entries: new Set(), levels: new Set(), sql: new Set(), sequences: new Set(), errors: new Set() },
+  hidden: { transfers: new Set(), steps: new Set(), entries: new Set(), levels: new Set(), variables: new Set(), sql: new Set(), sequences: new Set(), errors: new Set() },
 };
 
 // ── Upload / Drag ──────────────────────────────────────────────────────────
@@ -413,6 +416,7 @@ function renderAll() {
   renderTable('steps',     state.data.steps);
   renderTable('entries',   state.data.entries);
   renderTable('levels',    state.data.liquid_levels);
+  renderTable('variables', state.data.variables);
   renderTable('sql',       state.data.sql_stmts);
   renderTable('sequences', state.data.sequences);
   renderTable('errors',    state.data.error_events);
@@ -430,7 +434,7 @@ function renderAll() {
 const DATA_KEY = {
   transfers: 'transfers', steps: 'steps', entries: 'entries',
   levels: 'liquid_levels', variables: 'variables',
-  sql: 'sql_stmts', sequences: 'sequences', arrays: 'arrays',
+  sql: 'sql_stmts', sequences: 'sequences',
 };
 function getRows(key) { return state.data ? (state.data[DATA_KEY[key] || key] || []) : []; }
 
