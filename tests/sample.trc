@@ -1,0 +1,18 @@
+2024-03-15 09:00:00> Hamilton : Tip Pick Up - Start; 
+2024-03-15 09:00:01> Hamilton : Tip Pick Up - Complete; channel 1: TipRack_1, A1, channel 2: TipRack_1, A2, channel 3: TipRack_1, A3
+2024-03-15 09:00:02> Hamilton : Aspirate - Start; 
+2024-03-15 09:00:03> Hamilton : Aspirate - Complete; channel 1: SrcPlate_1, A1, 50.0 uL, channel 2: SrcPlate_1, A2, 50.0 uL, channel 3: SrcPlate_1, A3, 50.0 uL
+2024-03-15 09:00:04> Hamilton : Dispense - Start; 
+2024-03-15 09:00:05> Hamilton : Dispense - Complete; channel 1: DstPlate_1, B1, 50.0 uL, channel 2: DstPlate_1, B2, 50.0 uL, channel 3: DstPlate_1, B3, 50.0 uL
+2024-03-15 09:00:06> Hamilton : Tip Eject - Start; 
+2024-03-15 09:00:07> Hamilton : Tip Eject - Complete; channel 1: WasteBlock_1, A1, channel 2: WasteBlock_1, A1, channel 3: WasteBlock_1, A1
+2024-03-15 09:00:08> Hamilton : Tip Pick Up - Start; 
+2024-03-15 09:00:09> Hamilton : Tip Pick Up - Complete; channel 1: TipRack_1, B1, channel 2: TipRack_1, B2
+2024-03-15 09:00:10> Hamilton : Aspirate - Start; 
+2024-03-15 09:00:11> Hamilton : Aspirate - Complete; channel 1: SrcPlate_1, B1, 25.0 uL, channel 2: SrcPlate_1, B2, 30.0 uL
+2024-03-15 09:00:12> Hamilton : Dispense - Start; 
+2024-03-15 09:00:13> Hamilton : Dispense - Complete; channel 1: DstPlate_1, C1, 25.0 uL, channel 2: DstPlate_1, C2, 30.0 uL
+2024-03-15 09:00:14> Hamilton : Tip Eject - Start; 
+2024-03-15 09:00:15> Hamilton : Tip Eject - Complete; channel 1: WasteBlock_1, A1, channel 2: WasteBlock_1, A1
+2024-03-15 09:00:16> Hamilton : Aspirate - Start; 
+2024-03-15 09:00:17> Hamilton : Aspirate - Error; Liquid level detection failed for channel 1
