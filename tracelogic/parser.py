@@ -25,25 +25,43 @@ _RE_LINE = re.compile(
 )
 
 # Channel action with volume (Aspirate / Dispense)
+# Supports both formats:
+#   Old: "channel 1: Plate1, A1, 50.0 uL"
+#   Real: " > channel 1: VGM, A3, 384 uL"
 _RE_VOLUME_ACTION = re.compile(
     r"channel (?P<channel>\d+): (?P<labware>[^,]+), (?P<position>[^,]+), (?P<volume>[\d\.]+) uL"
 )
 
 # Channel action without volume (PickupTip / EjectTip)
+# Supports both formats:
+#   Old: "channel 1: TipRack, A1"
+#   Real: " > channel 1: HT_L_0001, 1"  or  " > channel 1: Waste, "
 _RE_TIP_ACTION = re.compile(
-    r"channel (?P<channel>\d+): (?P<labware>[^,]+), (?P<position>[^,>]+)"
+    r"channel (?P<channel>\d+): (?P<labware>[^,]+), (?P<position>[^,>]*)"
 )
 
 _TIMESTAMP_FMT = "%Y-%m-%d %H:%M:%S"
 
-# Commands that map to pipetting action types
+# Commands that map to pipetting action types.
+# Real Hamilton STAR uses "1000ul Channel Aspirate (Single Step)" etc.
+# We match by checking if any of these substrings appear in the command (case-insensitive).
 _PIPETTING_COMMANDS: dict[str, PipettingActionType] = {
-    "aspirate": PipettingActionType.Aspirate,
-    "dispense": PipettingActionType.Dispense,
-    "pickuptip": PipettingActionType.PickupTip,
+    # Real instrument commands (Single Step)
+    "1000ul channel aspirate (single step)":  PipettingActionType.Aspirate,
+    "1000ul channel dispense (single step)":  PipettingActionType.Dispense,
+    "1000ul channel tip pick up (single step)": PipettingActionType.PickupTip,
+    "1000ul channel tip eject (single step)": PipettingActionType.EjectTip,
+    "co-re 96 head aspirate (single step)":   PipettingActionType.Aspirate,
+    "co-re 96 head dispense (single step)":   PipettingActionType.Dispense,
+    "co-re 96 head tip pick up (single step)": PipettingActionType.PickupTip,
+    "co-re 96 head tip eject (single step)":  PipettingActionType.EjectTip,
+    # Generic / legacy commands
+    "aspirate":    PipettingActionType.Aspirate,
+    "dispense":    PipettingActionType.Dispense,
     "tip pick up": PipettingActionType.PickupTip,
-    "ejecttip": PipettingActionType.EjectTip,
-    "tip eject": PipettingActionType.EjectTip,
+    "pickuptip":   PipettingActionType.PickupTip,
+    "tip eject":   PipettingActionType.EjectTip,
+    "ejecttip":    PipettingActionType.EjectTip,
 }
 
 
@@ -64,9 +82,19 @@ def _parse_status(raw: str) -> EntryStatus:
 
 
 def _detect_action_type(command: str) -> Optional[PipettingActionType]:
-    """Return the PipettingActionType for a command string, or None."""
+    """Return the PipettingActionType for a command string, or None.
+
+    Matches by longest-first substring to avoid 'aspirate' matching
+    '1000ul channel aspirate (single step)' incorrectly.
+    """
     key = command.strip().lower()
-    return _PIPETTING_COMMANDS.get(key)
+    # Try exact match first, then longest-substring match
+    if key in _PIPETTING_COMMANDS:
+        return _PIPETTING_COMMANDS[key]
+    for cmd_key in sorted(_PIPETTING_COMMANDS, key=len, reverse=True):
+        if cmd_key in key:
+            return _PIPETTING_COMMANDS[cmd_key]
+    return None
 
 
 def _parse_channel_actions(details: str, with_volume: bool) -> list[ChannelAction]:
@@ -123,9 +151,12 @@ class TraceFileParser:
 
         try:
             lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-        except OSError as exc:
-            result.Errors.append(f"Cannot read file: {exc}")
-            return result
+        except OSError:
+            try:
+                lines = path.read_text(encoding="latin-1", errors="replace").splitlines()
+            except OSError as exc:
+                result.Errors.append(f"Cannot read file: {exc}")
+                return result
 
         result.AllEntries = self._parse_entries(lines, result.Errors)
         result.PipettingSteps = self._aggregate_steps(result.AllEntries)
