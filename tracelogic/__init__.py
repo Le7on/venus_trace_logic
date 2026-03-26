@@ -2,6 +2,7 @@
 
 from .enums import EntryStatus, PipettingActionType
 from .models import (
+    ArrayEvent,
     ChannelAction,
     LiquidLevelEvent,
     LiquidTransferEvent,
@@ -19,6 +20,6 @@ __all__ = [
     "EntryStatus", "PipettingActionType",
     "TraceEntry", "ChannelAction", "PipettingStep",
     "LiquidTransferEvent", "LiquidLevelEvent",
-    "VariableEvent", "SqlEvent", "SequenceEvent",
+    "VariableEvent", "SqlEvent", "SequenceEvent", "ArrayEvent",
     "TraceAnalysisResult", "TraceFileParser", "DataExporter",
 ]

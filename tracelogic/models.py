@@ -31,14 +31,14 @@ class ChannelAction:
 
 @dataclass
 class PipettingStep:
-    """An aggregated pipetting step (Aspirate/Dispense/PickupTip/EjectTip/LiquidLevel)."""
+    """An aggregated pipetting step."""
     ActionType: PipettingActionType
     StartTime: Optional[datetime]
     EndTime: Optional[datetime]
     Duration: Optional[timedelta]
     ChannelActions: list[ChannelAction] = field(default_factory=list)
     StartLineNumber: int = 0
-    LiquidClass: Optional[str] = None          # LC Utilized line preceding this step
+    LiquidClass: Optional[str] = None
 
 
 @dataclass
@@ -53,7 +53,7 @@ class LiquidTransferEvent:
     Volume: Optional[float]
     TipLabwareId: str
     TipPositionId: str
-    LiquidClass: Optional[str] = None          # LC used for this transfer
+    LiquidClass: Optional[str] = None
 
 
 @dataclass
@@ -61,7 +61,7 @@ class LiquidLevelEvent:
     """Result of a 'Get Last Liquid Level' step — height per channel (mm)."""
     Timestamp: Optional[datetime]
     StartLineNumber: int
-    ChannelLevels: dict[int, float] = field(default_factory=dict)  # {channel: mm}
+    ChannelLevels: dict[int, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -70,8 +70,8 @@ class VariableEvent:
     Timestamp: Optional[datetime]
     LineNumber: int
     RawDetail: str
-    Name: Optional[str] = None    # parsed variable name if detectable
-    Value: Optional[str] = None   # parsed value if detectable
+    Name: Optional[str] = None
+    Value: Optional[str] = None
 
 
 @dataclass
@@ -79,12 +79,12 @@ class SqlEvent:
     """A USER Trace line containing a SQL statement."""
     Timestamp: Optional[datetime]
     LineNumber: int
-    Statement: str                 # full SQL text
+    Statement: str
 
 
 @dataclass
 class SequenceEvent:
-    """A USER Trace line describing a sequence state (name/current/count/etc.)."""
+    """A USER Trace line describing a sequence state."""
     Timestamp: Optional[datetime]
     LineNumber: int
     Name: Optional[str] = None
@@ -99,6 +99,23 @@ class SequenceEvent:
 
 
 @dataclass
+class ArrayEvent:
+    """A DEBUG TraceArray block — named array with indexed values.
+
+    Example .trc block::
+
+        2026-01-01 09:00:00> DEBUG : TraceArray - complete; name = myArray
+        2026-01-01 09:00:00> DEBUG : TraceArray - complete; 0 = 100
+        2026-01-01 09:00:00> DEBUG : TraceArray - complete; 1 = 200
+    """
+    Timestamp: Optional[datetime]
+    StartLineNumber: int
+    Name: str
+    Values: list[str] = field(default_factory=list)   # index-ordered values
+    RawItems: dict[int, str] = field(default_factory=dict)  # {index: value}
+
+
+@dataclass
 class TraceAnalysisResult:
     """Complete result of parsing and analysing a .trc file."""
     FileName: str
@@ -109,5 +126,6 @@ class TraceAnalysisResult:
     Variables: list[VariableEvent] = field(default_factory=list)
     SqlStatements: list[SqlEvent] = field(default_factory=list)
     Sequences: list[SequenceEvent] = field(default_factory=list)
-    LiquidClasses: list[str] = field(default_factory=list)   # all LC names referenced
+    Arrays: list[ArrayEvent] = field(default_factory=list)
+    LiquidClasses: list[str] = field(default_factory=list)
     Errors: list[str] = field(default_factory=list)
