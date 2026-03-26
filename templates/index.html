@@ -138,6 +138,18 @@
   tbody td { padding: 6px 10px; color: var(--text-dim); white-space: nowrap; }
   tbody td.wrap { white-space: normal; word-break: break-word; max-width: 300px; }
 
+  /* SQL syntax highlight */
+  .sql-block { background: #1a1a2e; border-radius: 6px; padding: 10px 14px; margin: 0;
+               font-family: 'Consolas','Courier New',monospace; font-size: 0.82rem;
+               line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #c9d1d9; }
+  .sql-kw   { color: #ff7b72; font-weight: bold; }   /* keywords */
+  .sql-fn   { color: #d2a8ff; }                       /* functions */
+  .sql-str  { color: #a5d6ff; }                       /* string literals */
+  .sql-num  { color: #79c0ff; }                       /* numbers */
+  .sql-cmt  { color: #8b949e; font-style: italic; }   /* comments */
+  .sql-at   { color: #ffa657; }                       /* @params */
+  td.sql-cell { padding: 4px 8px; vertical-align: top; }
+
   /* ── Pagination ── */
   .pagination {
     display: flex; align-items: center; gap: 8px;
@@ -420,6 +432,25 @@ const DATA_KEY = {
 };
 function getRows(key) { return state.data ? (state.data[DATA_KEY[key] || key] || []) : []; }
 
+// ── SQL Syntax Highlight ───────────────────────────────────────────────────
+const SQL_KW = /\b(SELECT|FROM|WHERE|AND|OR|NOT|IN|AS|INSERT|INTO|VALUES|UPDATE|SET|DELETE|USE|EXEC|EXECUTE|TOP|DISTINCT|ORDER|BY|ASC|DESC|GROUP|HAVING|JOIN|LEFT|RIGHT|INNER|OUTER|ON|COUNT|SUM|AVG|MAX|MIN|FORMAT|CAST|CONVERT|CASE|WHEN|THEN|ELSE|END|NULL|IS|LIKE|BETWEEN|EXISTS|WITH)\b/g;
+const SQL_FN = /\b(FORMAT|CAST|CONVERT|COUNT|SUM|AVG|MAX|MIN|ISNULL|COALESCE|LEN|TRIM|UPPER|LOWER|GETDATE|DATEADD|DATEDIFF)\b/g;
+const SQL_AT = /@[\w]+/g;
+const SQL_NUM = /\b(\d+(?:\.\d+)?)\b/g;
+
+function highlightSql(raw) {
+  if (!raw) return '';
+  // Split on string literals to protect them
+  const parts = raw.split(/('(?:[^']|'')*')/g);
+  return parts.map((p, i) => {
+    if (i % 2 === 1) return `<span class="sql-str">${esc(p)}</span>`;
+    return esc(p)
+      .replace(SQL_KW, '<span class="sql-kw">$1</span>')
+      .replace(SQL_AT, m => `<span class="sql-at">${m}</span>`)
+      .replace(SQL_NUM, '<span class="sql-num">$1</span>');
+  }).join('');
+}
+
 function renderTable(key, rows) {
   const cols = state.cols[key].filter(c => !state.hidden[key].has(c));
   const tbl  = document.getElementById('tbl-' + key);
@@ -448,10 +479,14 @@ function renderTable(key, rows) {
     '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
 
   // Body
-  const wrapCols = new Set(['Details', 'Source', 'Command', 'Statement', 'RawDetail', 'Name', 'Label']);
-  const objCols  = new Set(['ChannelLevels', 'Values']);
+  const wrapCols  = new Set(['Details', 'Source', 'Command', 'RawDetail', 'Name', 'Label']);
+  const objCols   = new Set(['ChannelLevels', 'Values']);
+  const sqlCols   = new Set(['Statement']);
   tbl.querySelector('tbody').innerHTML = slice.map(row =>
     '<tr>' + cols.map(c => {
+      if (sqlCols.has(c) && key === 'sql') {
+        return `<td class="sql-cell"><pre class="sql-block">${highlightSql(row[c] ?? '')}</pre></td>`;
+      }
       const cls = wrapCols.has(c) ? ' class="wrap"' : '';
       let val = row[c] ?? '';
       if (objCols.has(c)) {

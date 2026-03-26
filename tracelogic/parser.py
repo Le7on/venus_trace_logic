@@ -78,15 +78,44 @@ _RE_SQL_FINAL = re.compile(
     r"^##\s*Final String\s*:\s*(?P<sql>.+)$", re.IGNORECASE
 )
 
-# SQL type detection
-_SQL_TYPES = [
-    (re.compile(r"^\s*Use\s+\w", re.IGNORECASE), "USE"),
-    (re.compile(r"\bSelect\b", re.IGNORECASE), "SELECT"),
-    (re.compile(r"\bInsert\b", re.IGNORECASE), "INSERT"),
-    (re.compile(r"\bUpdate\b", re.IGNORECASE), "UPDATE"),
-    (re.compile(r"\bDelete\b", re.IGNORECASE), "DELETE"),
-    (re.compile(r"\bExec(?:ute)?\b", re.IGNORECASE), "EXEC"),
+# SQL keywords to uppercase-normalize
+_SQL_KEYWORDS = [
+    "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "AS",
+    "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE",
+    "USE", "EXEC", "EXECUTE", "TOP", "DISTINCT", "ORDER", "BY",
+    "ASC", "DESC", "GROUP", "HAVING", "JOIN", "LEFT", "RIGHT",
+    "INNER", "OUTER", "ON", "COUNT", "SUM", "AVG", "MAX", "MIN",
+    "FORMAT", "CAST", "CONVERT", "CASE", "WHEN", "THEN", "ELSE",
+    "END", "NULL", "IS", "LIKE", "BETWEEN", "EXISTS", "WITH",
 ]
+_SQL_KW_RE = re.compile(
+    r'\b(' + '|'.join(_SQL_KEYWORDS) + r')\b', re.IGNORECASE
+)
+
+
+def _normalize_sql(sql: str) -> str:
+    """Uppercase all SQL keywords while preserving string literals."""
+    # Protect single-quoted strings
+    parts = re.split(r"('(?:[^']|'')*')", sql)
+    result = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:  # inside quotes — leave as-is
+            result.append(part)
+        else:
+            result.append(_SQL_KW_RE.sub(lambda m: m.group().upper(), part))
+    return "".join(result)
+
+
+def _detect_sql_type(sql: str) -> str:
+    """Detect SQL statement type from normalized SQL."""
+    s = sql.strip().upper()
+    # USE ... EXEC is really an EXEC
+    if re.match(r'USE\s+\w+\s+EXEC\b', s):
+        return "EXEC"
+    for kw in ("SELECT", "INSERT", "UPDATE", "DELETE", "EXEC", "EXECUTE", "USE"):
+        if re.match(rf'\s*(?:USE\s+\w+\s+)?{kw}\b', s):
+            return kw.replace("EXECUTE", "EXEC")
+    return "UNKNOWN"
 
 # Extract database name from "Use DbName"
 _RE_USE_DB = re.compile(r"\bUse\s+(\w+)", re.IGNORECASE)
@@ -120,12 +149,11 @@ def _parse_sql_event(entry: "TraceEntry") -> Optional["SqlEvent"]:
     if not sql_text:
         return None
 
+    # Normalize keywords to uppercase
+    sql_text = _normalize_sql(sql_text)
+
     # Detect SQL type
-    sql_type = "UNKNOWN"
-    for pattern, stype in _SQL_TYPES:
-        if pattern.search(sql_text):
-            sql_type = stype
-            break
+    sql_type = _detect_sql_type(sql_text)
 
     # Extract database
     db_m = _RE_USE_DB.search(sql_text)
