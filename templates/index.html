@@ -367,6 +367,7 @@ const state = {
     variables: ["Timestamp","LineNumber","Name","Value"],
     sql:       ["Timestamp","LineNumber","SqlType","Database","TableOrProc","Label","IsTruncated","Statement"],
     sequences: ["Timestamp","LineNumber","Name","Current","Count","Total","Max","Used","LabwareId","PositionId"],
+    errors:    ["Timestamp","LineNumber","Severity","Source","Command","Message","ContextBefore","ContextAfter"],
   },
   hidden: { transfers: new Set(), steps: new Set(), entries: new Set(), levels: new Set(), variables: new Set(), sql: new Set(), sequences: new Set(), errors: new Set() },
 };
@@ -434,7 +435,7 @@ function renderAll() {
 const DATA_KEY = {
   transfers: 'transfers', steps: 'steps', entries: 'entries',
   levels: 'liquid_levels', variables: 'variables',
-  sql: 'sql_stmts', sequences: 'sequences',
+  sql: 'sql_stmts', sequences: 'sequences', errors: 'error_events',
 };
 function getRows(key) { return state.data ? (state.data[DATA_KEY[key] || key] || []) : []; }
 
