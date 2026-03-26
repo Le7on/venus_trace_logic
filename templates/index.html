@@ -398,7 +398,7 @@ async function parseFile() {
     const data = await res.json();
     if (data.error) { setStatus(data.error, true); return; }
     state.data = data;
-    state.pages = { transfers: 1, steps: 1, entries: 1, levels: 1, sql: 1, sequences: 1, errors: 1 };
+    state.pages = { transfers: 1, steps: 1, entries: 1, levels: 1, variables: 1, sql: 1, sequences: 1, errors: 1 };
     renderAll();
     document.getElementById('results-section').classList.remove('hidden');
     document.getElementById('export-btn').disabled = false;
